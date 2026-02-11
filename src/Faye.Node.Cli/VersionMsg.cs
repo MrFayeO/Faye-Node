@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 
-public readonly record struct VersionMsg
+public readonly record struct VersionMsg : IBitcoinPayload
 {
     readonly public int _Version { get; init; }
     readonly public ulong _Services { get; init; }
@@ -35,6 +35,25 @@ public readonly record struct VersionMsg
         stream.WriteU64LE(_Nonce);
         stream.WriteVarString(_UserAgent);
     }
+
+    public static IBitcoinPayload Deserialize(byte[] data)
+    {
+        ByteStreamReader streamReader = new(data);
+
+        return new VersionMsg
+        {
+            _Version = streamReader.ReadI32LE(),
+            _Services = streamReader.ReadU64LE(),
+            _Timestamp = streamReader.ReadI64LE(),
+            _AddrRecv = streamReader.ReadNetAddrWithoutTime(),
+            _AddrFrom = streamReader.ReadNetAddrWithoutTime(),
+            _Nonce = streamReader.ReadU64LE(),
+            _UserAgent = streamReader.ReadVarString(),
+
+        };
+    }
+
+
 
     public override string ToString()
     {

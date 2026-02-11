@@ -264,4 +264,12 @@ ref struct ByteStreamWriter
         WriteString(str);
 
     }
+
+    public void WriteString(string str, int len)
+    {
+        var output = _Writer.GetSpan(len);
+        output.Clear();
+        Encoding.ASCII.GetBytes(str, output);
+        _Writer.Advance(len);
+    }
 }

@@ -1,26 +1,14 @@
-using System.Buffers;
-
 public sealed class Network
 {
     private const string NODE_ADDR = "25miqadfzmfkt6s5lg6alb7jhztqkxpq66hefqhj7vd4mmvuhnvullad.onion";
-    private readonly Dictionary<ulong, Node> _NodeLookUpTable = [];
-    private ulong _NodeIdCounter = 0;
-
 
     public async Task PeerConnect()
     {
         SockS5 nodeSocket = new(Constants.TOR_PORT);
         var domainRes = nodeSocket.ConnectToDomain(NODE_ADDR);
 
-        var currentNodeIndex = _NodeIdCounter;
-        _NodeLookUpTable[_NodeIdCounter++] = new Node(socket: nodeSocket, addr: NODE_ADDR, nodeId: currentNodeIndex);
-
-        ArrayBufferWriter<byte> payloadWriter = new();
-        var VersionMessage = new VersionMsg(services: 0);
-        VersionMessage.Serialize(ref payloadWriter);
-
-        byte[] versionHeader = new byte[24];
-        PacketHeader.Create(CommandName.Version, payloadWriter.WrittenSpan).ToBytes(versionHeader);
+        IBitcoinPayload versionPayload = new VersionMsg(services: 0);
+        NetMsg versionMsg = new(versionPayload, CommandName.Version);
 
         var ClientIO = nodeSocket.AsNetworkStream();
 
@@ -28,44 +16,31 @@ public sealed class Network
         if (res != (int)SockS5Reply.SOCK5_REPLY_GRANTED)
         {
             // Not handled, log for now
-            Console.WriteLine($"Failed to connect to domain with Node index: {currentNodeIndex}");
+            Console.WriteLine($"Failed to connect to domain");
             return;
         }
 
-        await ClientIO.WriteAsync(versionHeader);
-        await ClientIO.WriteAsync(payloadWriter.WrittenMemory);
+        await ClientIO.WriteAsync(versionMsg.MemoryNetMsg);
 
-        await ClientIO.ReadExactlyAsync(versionHeader);
-        var respHeader = PacketHeader.Parse(versionHeader);
+        byte[] header = new byte[24];
+        await ClientIO.ReadExactlyAsync(header);
+        var respHeader = PacketHeader.Parse(header);
 
         Console.WriteLine(respHeader);
 
-        byte[] respPayload = new byte[respHeader.PayloadLength];
-        await ClientIO.ReadExactlyAsync(respPayload);
+        byte[] versionReply = new byte[respHeader.PayloadLength];
+        await ClientIO.ReadExactlyAsync(versionReply);
 
-        ByteStreamReader streamReader = new(respPayload);
-        var parsedVersion = new VersionMsg
-        {
-            _Version = streamReader.ReadI32LE(),
-            _Services = streamReader.ReadU64LE(),
-            _Timestamp = streamReader.ReadI64LE(),
-            _AddrRecv = streamReader.ReadNetAddrWithoutTime(),
-            _AddrFrom = streamReader.ReadNetAddrWithoutTime(),
-            _Nonce = streamReader.ReadU64LE(),
-            _UserAgent = streamReader.ReadVarString(),
-
-        };
-
+        var parsedVersion = VersionMsg.Deserialize(versionReply);
 
         Console.WriteLine(parsedVersion);
 
-        byte[] verackHeader = new byte[24];
-        PacketHeader.Create(CommandName.VerAck, []).ToBytes(verackHeader);
+        NetMsg verackMsg = new(CommandName.VerAck);
 
-        await ClientIO.WriteAsync(verackHeader);
+        await ClientIO.WriteAsync(verackMsg.MemoryNetMsg);
 
-        await ClientIO.ReadExactlyAsync(verackHeader);
-        var verack = PacketHeader.Parse(verackHeader);
+        await ClientIO.ReadExactlyAsync(header);
+        var verack = PacketHeader.Parse(header);
 
         Console.WriteLine(verack);
 

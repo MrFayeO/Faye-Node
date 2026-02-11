@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using Microsoft.VisualBasic;
-
 public class Node
 {
     readonly SockS5 _Socket;

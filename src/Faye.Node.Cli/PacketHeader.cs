@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Text;
 
@@ -24,15 +25,14 @@ public sealed class PacketHeader
     public uint PayloadLength => _PayloadLength;
     public uint Checksum => _Checksum;
 
-    public void ToBytes(byte[] h24)
+    public void ToBytes(ref ArrayBufferWriter<byte> writer)
     {
-        var h24Span = h24.AsSpan();
-        int cnt = 0;
-        Utils.U32LE(h24Span, ref cnt, _Magic);
-        Encoding.ASCII.GetBytes(_Command, h24Span[cnt..(cnt + CMD_LENGTH)]);
-        cnt += CMD_LENGTH;
-        Utils.U32LE(h24Span[cnt..(cnt + 4)], ref cnt, _PayloadLength);
-        Utils.U32LE(h24Span[cnt..(cnt + 4)], ref cnt, _Checksum);
+        var stream = new ByteStreamWriter(writer);
+
+        stream.WriteU32LE(_Magic);
+        stream.WriteString(_Command, CMD_LENGTH);
+        stream.WriteU32LE(_PayloadLength);
+        stream.WriteU32LE(_Checksum);
     }
 
     public static PacketHeader Create(string command, ReadOnlySpan<byte> payload)
