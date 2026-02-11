@@ -1,3 +1,5 @@
+using System.Net;
+
 public class NetAddr
 {
     private readonly uint _Time;
@@ -31,15 +33,20 @@ public class NetAddr
 
     public static NetAddr ParseWithoutTime(byte[] data)
     {
-        int cnt = 0;
-        var dataSpan = data.AsSpan();
-        // var time = Utils.ReadU32LE(dataSpan, ref cnt);
-        var services = Utils.ReadI64LE(dataSpan[cnt..(cnt + 8)], ref cnt);
-        cnt += 12; // Skip to IPv4
-        var ip = Utils.ReadU32LE(dataSpan[cnt..(cnt + 4)], ref cnt);
-        var port = Utils.ReadI16LE(dataSpan[cnt..(cnt + 2)], ref cnt);
+        var stream = new ByteStreamReader(data);
 
-        return new NetAddr(services, ip, port);
+        var services = stream.ReadU32LE();
+        stream.SkipBytes(12);
+        var ip = stream.ReadU32BE();
+        var port = stream.ReadI16LE();
+
+        return new NetAddr
+        (
+            services: services,
+            ip: ip,
+            port: port
+
+        );
     }
 
     public static NetAddr ParseWithTime(byte[] data)
@@ -56,6 +63,12 @@ public class NetAddr
     public void SerializeWithTime(Span<byte> output, ref int cnt)
     {
         throw new NotImplementedException();
+    }
+
+    public override string ToString()
+    {
+
+        return $"Services: {_Services}, Ip: {new IPAddress(_Ip)}, Port: {_Port}";
     }
 
 

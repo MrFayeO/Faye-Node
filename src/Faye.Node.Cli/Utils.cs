@@ -14,32 +14,16 @@ public class Utils
 
         };
 
-
-    public static void U32LE(Span<byte> output, ref int cnt, uint value)
+    public static ulong GenerateNonce()
     {
-        BinaryPrimitives.WriteUInt32LittleEndian(output, value);
-        cnt += 4;
+        return BinaryPrimitives.ReadUInt64LittleEndian(RandomNumberGenerator.GetBytes(8));
     }
 
-
-    public static short ReadI16LE(Span<byte> input, ref int cnt)
+    public static long GetUnixTimeInSeconds()
     {
-        cnt += 2;
-        return BinaryPrimitives.ReadInt16LittleEndian(input);
+        return DateTimeOffset.Now.ToUnixTimeSeconds();
     }
 
-    public static uint ReadU32LE(Span<byte> input, ref int cnt)
-    {
-        cnt += 4;
-        return BinaryPrimitives.ReadUInt32LittleEndian(input);
-    }
-
-
-    public static long ReadI64LE(Span<byte> input, ref int cnt)
-    {
-        cnt += 8;
-        return BinaryPrimitives.ReadInt64LittleEndian(input);
-    }
     public static uint CalculateChecksum(ReadOnlySpan<byte> payload)
     {
         var digest1 = SHA256.HashData(payload);

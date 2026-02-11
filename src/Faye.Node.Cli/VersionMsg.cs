@@ -1,6 +1,4 @@
 using System.Buffers;
-using System.Buffers.Binary;
-using System.Security.Cryptography;
 
 public readonly record struct VersionMsg : IBitcoinPayload
 {
@@ -16,10 +14,10 @@ public readonly record struct VersionMsg : IBitcoinPayload
     {
         _Version = Constants.VERSION;
         _Services = services;
-        _Timestamp = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        _Timestamp = Utils.GetUnixTimeInSeconds();
         _AddrRecv = new();
         _AddrFrom = new();
-        _Nonce = BinaryPrimitives.ReadUInt64LittleEndian(RandomNumberGenerator.GetBytes(8));
+        _Nonce = Utils.GenerateNonce();
         _UserAgent = Constants.USER_AGENT;
 
     }
@@ -57,6 +55,6 @@ public readonly record struct VersionMsg : IBitcoinPayload
 
     public override string ToString()
     {
-        return $"Version: {_Version}, Services: {_Services}, Timestamp: {_Timestamp}, Nonce: {_Nonce:X} agent: {_UserAgent}";
+        return $"Version: {_Version}, Services: {_Services}, Timestamp: {_Timestamp}, Nonce: {_Nonce:X} agent: {_UserAgent} \nRecv: {_AddrRecv} \nFrom: {_AddrFrom}";
     }
 }
