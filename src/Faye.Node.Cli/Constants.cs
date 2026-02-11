@@ -23,5 +23,6 @@ public class Constants
     public const int VERSION = 70015;
     public const string USER_AGENT = "Faye-Node";
     public const int HEADER_SIZE = 24;
+    public const int CMD_LENGTH = 12;
     public const uint EMPTY_CHECKSUM = 0xE2E0F65D;
 }

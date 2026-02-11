@@ -1,15 +1,10 @@
 using System.Buffers;
-using System.Buffers.Binary;
-using System.Text;
-
 public sealed class PacketHeader
 {
     readonly uint _Magic;
     readonly string _Command;
     readonly uint _PayloadLength;
     readonly uint _Checksum;
-
-    private const int CMD_LENGTH = 12;
 
     PacketHeader(uint magic, string command, uint payloadLength, uint checksum)
     {
@@ -30,7 +25,7 @@ public sealed class PacketHeader
         var stream = new ByteStreamWriter(writer);
 
         stream.WriteU32LE(_Magic);
-        stream.WriteString(_Command, CMD_LENGTH);
+        stream.WriteString(_Command, Constants.CMD_LENGTH);
         stream.WriteU32LE(_PayloadLength);
         stream.WriteU32LE(_Checksum);
     }
@@ -43,12 +38,14 @@ public sealed class PacketHeader
 
     public static PacketHeader Parse(byte[] h24)
     {
-        var h24Span = h24.AsSpan();
-        uint magic = BinaryPrimitives.ReadUInt32LittleEndian(h24Span[..4]);
-        string command = Encoding.ASCII.GetString(h24Span[4..16]);
-        uint payload = BinaryPrimitives.ReadUInt32LittleEndian(h24Span[16..20]);
-        uint checksum = BinaryPrimitives.ReadUInt32LittleEndian(h24Span[20..24]);
-        return new PacketHeader(magic, command, payload, checksum);
+        var stream = new ByteStreamReader(h24);
+        return new
+        (
+            magic: stream.ReadU32LE(),
+            command: stream.ReadString(Constants.CMD_LENGTH),
+            payloadLength: stream.ReadU32LE(),
+            checksum: stream.ReadU32LE()
+        );
 
     }
 

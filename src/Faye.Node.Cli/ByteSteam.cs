@@ -122,6 +122,13 @@ ref struct ByteStreamReader
         return str;
     }
 
+    public string ReadString(int len)
+    {
+        string command = Encoding.ASCII.GetString(_Block.Slice(_Cnt, len));
+        _Cnt += len;
+        return command;
+    }
+
     public NetAddr ReadNetAddrWithoutTime()
     {
         // TODO: Actually read something
