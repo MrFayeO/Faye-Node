@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Security.Cryptography;
 using System.Text;
 
 public sealed class PacketHeader
@@ -38,10 +37,7 @@ public sealed class PacketHeader
 
     public static PacketHeader Create(string command, ReadOnlySpan<byte> payload)
     {
-        var digest1 = SHA256.HashData(payload);
-        var digest2 = SHA256.HashData(digest1);
-        var checksum = BinaryPrimitives.ReadUInt32LittleEndian(digest2.AsSpan()[..4]);
-
+        var checksum = Utils.CalculateChecksum(payload);
         return new PacketHeader(Constants.CHAIN, command, (uint)payload.Length, checksum);
     }
 

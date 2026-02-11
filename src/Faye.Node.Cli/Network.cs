@@ -16,8 +16,8 @@ public sealed class Network
         _NodeLookUpTable[_NodeIdCounter++] = new Node(socket: nodeSocket, addr: NODE_ADDR, nodeId: currentNodeIndex);
 
         ArrayBufferWriter<byte> payloadWriter = new();
-        var VersionMessage = new VersionMessage(services: 0);
-        VersionMessage.Serialize(ref payloadWriter, protocolVersion: 0);
+        var VersionMessage = new VersionMsg(services: 0);
+        VersionMessage.Serialize(ref payloadWriter);
 
         byte[] versionHeader = new byte[24];
         PacketHeader.Create(CommandName.Version, payloadWriter.WrittenSpan).ToBytes(versionHeader);
@@ -43,8 +43,21 @@ public sealed class Network
         byte[] respPayload = new byte[respHeader.PayloadLength];
         await ClientIO.ReadExactlyAsync(respPayload);
 
-        var resp = VersionMessage.Parse(respPayload);
-        Console.WriteLine(resp);
+        ByteStreamReader streamReader = new(respPayload);
+        var parsedVersion = new VersionMsg
+        {
+            _Version = streamReader.ReadI32LE(),
+            _Services = streamReader.ReadU64LE(),
+            _Timestamp = streamReader.ReadI64LE(),
+            _AddrRecv = streamReader.ReadNetAddrWithoutTime(),
+            _AddrFrom = streamReader.ReadNetAddrWithoutTime(),
+            _Nonce = streamReader.ReadU64LE(),
+            _UserAgent = streamReader.ReadVarString(),
+
+        };
+
+
+        Console.WriteLine(parsedVersion);
 
         byte[] verackHeader = new byte[24];
         PacketHeader.Create(CommandName.VerAck, []).ToBytes(verackHeader);
