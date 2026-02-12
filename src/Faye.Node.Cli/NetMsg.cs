@@ -1,4 +1,5 @@
 using System.Buffers;
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
 public class NetMsg
 {
@@ -10,6 +11,10 @@ public class NetMsg
     public IBitcoinPayload Payload => _Payload;
     public PacketHeader Header => _Header;
 
+    public NetMsg() : base()
+    {
+
+    }
 
     public NetMsg(string command)
     {
@@ -40,4 +45,22 @@ public class NetMsg
         writer.WrittenSpan.CopyTo(_MemoryNetMsg);
     }
 
+    public NetMsg(IBitcoinPayload payload, PacketHeader h24)
+    {
+        _Payload = payload;
+        _Header = h24;
+    }
+
+    public NetMsg(PacketHeader h24)
+    {
+        _MemoryNetMsg = new byte[Constants.HEADER_SIZE];
+        _Header = h24;
+        ArrayBufferWriter<byte> writer = new();
+        h24.ToBytes(ref writer);
+        writer.WrittenSpan.CopyTo(_MemoryNetMsg);
+    }
+
 }
+
+
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.

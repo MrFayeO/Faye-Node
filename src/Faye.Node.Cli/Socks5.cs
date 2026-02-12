@@ -63,7 +63,7 @@ public sealed class SockS5
         await clientIO.WriteAsync([SOCKS5_VERSION, SOCKS5_NMETHODS_ONE, SOCKS5_METHOD_NO_AUTH], 0, 3);
 
         CancellationTokenSource cts = new();
-        cts.CancelAfter(7500);
+        cts.CancelAfter(30000);
 
         byte[] greeting = new byte[2];
         await clientIO.ReadExactlyAsync(greeting, cts.Token);

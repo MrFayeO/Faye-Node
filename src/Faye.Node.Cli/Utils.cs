@@ -32,5 +32,13 @@ public class Utils
 
     }
 
+    public static string GetStringWithNoPadding(string str)
+    {
+        var idx = str.IndexOf('\0');
+
+        return str[..idx];
+    }
+
+
 
 }

@@ -1,49 +1,131 @@
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+
 public sealed class Network
 {
-    private const string NODE_ADDR = "25miqadfzmfkt6s5lg6alb7jhztqkxpq66hefqhj7vd4mmvuhnvullad.onion";
+    private Channel<string> _OutboundConnectionQueue = Channel.CreateUnbounded<string>();
+    private ulong _Cnt = 0;
+    ConcurrentDictionary<ulong, Node> _Peers = new();
 
-    public async Task PeerConnect()
+    private PeerManager? _Pm;
+
+    public async Task Run()
     {
-        SockS5 nodeSocket = new(Constants.TOR_PORT);
-        var domainRes = nodeSocket.ConnectToDomain(NODE_ADDR);
-
-        IBitcoinPayload versionPayload = new VersionMsg(services: 0);
-        NetMsg versionMsg = new(versionPayload, CommandName.Version);
-
-        var ClientIO = nodeSocket.AsNetworkStream();
-
-        var res = await domainRes;
-        if (res != (int)SockS5Reply.SOCK5_REPLY_GRANTED)
+        await foreach (var addr in _OutboundConnectionQueue.Reader.ReadAllAsync())
         {
-            // Not handled, log for now
-            Console.WriteLine($"Failed to connect to domain");
-            return;
+
+            SockS5 nodeSocket = new(Constants.TOR_PORT);
+
+            try
+            {
+                await nodeSocket.ConnectToDomain(addr);
+            }
+            catch (EndOfStreamException)
+            {
+                Console.WriteLine($"Failed to connect to peer {addr}");
+                continue;
+            }
+
+            Console.WriteLine($"Connected to peer:{addr}");
+            Node newNode = new(nodeSocket, addr, _Cnt);
+            _Peers[_Cnt] = newNode;
+            _Cnt++;
+
+            _ = _Pm?.InitializeNode(newNode);
+            _ = ProcessOutboundMsg(newNode);
+            _ = ProcessInboundMsg(newNode);
+
+
+
+
         }
+    }
 
-        await ClientIO.WriteAsync(versionMsg.MemoryNetMsg);
+    public void Bind(PeerManager pm)
+    {
+        _Pm = pm;
+    }
 
-        byte[] header = new byte[24];
-        await ClientIO.ReadExactlyAsync(header);
-        var respHeader = PacketHeader.Parse(header);
+    private async Task ProcessOutboundMsg(Node peer)
+    {
+        var netStream = peer.Socket.AsNetworkStream();
+        await foreach (var msg in peer.OutboundMessages())
+        {
+            Console.WriteLine("Sending out msg");
+            Console.WriteLine(msg.Header);
+            Console.WriteLine(msg.Payload);
+            await netStream.WriteAsync(msg.MemoryNetMsg);
 
-        Console.WriteLine(respHeader);
+        }
+    }
 
-        byte[] versionReply = new byte[respHeader.PayloadLength];
-        await ClientIO.ReadExactlyAsync(versionReply);
+    private async Task ProcessInboundMsg(Node peer)
+    {
+        while (true)
+        {
+            var netStream = peer.Socket.AsNetworkStream();
+            byte[] h24 = new byte[24];
 
-        var parsedVersion = VersionMsg.Deserialize(versionReply);
+            await netStream.ReadExactlyAsync(h24);
+            var parsedHeader = PacketHeader.Parse(h24);
 
-        Console.WriteLine(parsedVersion);
+            // TODO: Create a Dispatch to take command raw payload
+            //  and construct the correct NetMsg
+            NetMsg newMsg = new();
+            var cmd = Utils.GetStringWithNoPadding(parsedHeader.Command);
+            switch (cmd)
+            {
+                case "version":
+                    byte[] payload = new byte[parsedHeader.PayloadLength];
+                    await netStream.ReadExactlyAsync(payload);
+                    IBitcoinPayload parsedVersion = VersionMsg.Deserialize(payload);
+                    newMsg = new(parsedVersion, parsedHeader);
+                    break;
 
-        NetMsg verackMsg = new(CommandName.VerAck);
+                case "ping":
+                case "pong":
+                    payload = new byte[parsedHeader.PayloadLength];
+                    await netStream.ReadExactlyAsync(payload);
+                    IBitcoinPayload parsedPingPong = PingPongMsg.Deserialize(payload);
+                    newMsg = new(parsedPingPong, parsedHeader);
+                    break;
 
-        await ClientIO.WriteAsync(verackMsg.MemoryNetMsg);
+                case "verack":
+                    newMsg = new(parsedHeader);
+                    break;
 
-        await ClientIO.ReadExactlyAsync(header);
-        var verack = PacketHeader.Parse(header);
+                case "wtxidrelay":
+                case "feefilter":
+                case "sendcmpct":
+                case "sendaddrv2":
+                case "alert":
+                case "inv":
+                    payload = new byte[parsedHeader.PayloadLength];
+                    await netStream.ReadExactlyAsync(payload);
+                    continue;
 
-        Console.WriteLine(verack);
+                default:
+                    Console.WriteLine($"Unsupported Cmd: {cmd}");
+                    continue;
 
+            }
+            Console.WriteLine($"New inbound message for {peer.NodeId}");
+            Console.WriteLine(newMsg.Header);
+            Console.WriteLine(newMsg.Payload);
+            Console.WriteLine("---------------------------------------------");
+            peer.AddInboundMsg(newMsg);
+            await Task.Delay(1000);
+        }
+    }
+
+    public void AddNewPeer(string addr)
+    {
+        _OutboundConnectionQueue.Writer.TryWrite(addr);
+    }
+
+    public ConcurrentDictionary<ulong, Node> GetPeers()
+    {
+        return _Peers;
     }
 
 }

@@ -12,6 +12,8 @@ public readonly record struct CommandName(string Value)
 {
     public static readonly CommandName VerAck = new("verack");
     public static readonly CommandName Version = new("version");
+    public static readonly CommandName Ping = new("ping");
+    public static readonly CommandName Pong = new("pong");
 
     public static implicit operator string(CommandName c) => c.Value;
 }
@@ -20,7 +22,7 @@ public class Constants
 {
     public const short TOR_PORT = 9050;
     public const uint CHAIN = (uint)NetworkChain.Mainnet;
-    public const int VERSION = 70015;
+    public const int VERSION = 70016;
     public const string USER_AGENT = "Faye-Node";
     public const int HEADER_SIZE = 24;
     public const int CMD_LENGTH = 12;
