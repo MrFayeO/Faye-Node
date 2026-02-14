@@ -1,14 +1,13 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 
-public sealed class Network
+public sealed class Network : INetworkEvent
 {
     private Channel<string> _OutboundConnectionQueue = Channel.CreateUnbounded<string>();
     private ulong _Cnt = 0;
     ConcurrentDictionary<ulong, Node> _Peers = new();
 
-    private PeerManager? _Pm;
-
+    public event Action<Node>? OnNodeConnected;
     public async Task Run()
     {
         await foreach (var addr in _OutboundConnectionQueue.Reader.ReadAllAsync())
@@ -31,20 +30,13 @@ public sealed class Network
             _Peers[_Cnt] = newNode;
             _Cnt++;
 
-            _ = _Pm?.InitializeNode(newNode);
+            OnNodeConnected?.Invoke(newNode);
             _ = ProcessOutboundMsg(newNode);
             _ = ProcessInboundMsg(newNode);
-
-
-
 
         }
     }
 
-    public void Bind(PeerManager pm)
-    {
-        _Pm = pm;
-    }
 
     private async Task ProcessOutboundMsg(Node peer)
     {
@@ -121,11 +113,6 @@ public sealed class Network
     public void AddNewPeer(string addr)
     {
         _OutboundConnectionQueue.Writer.TryWrite(addr);
-    }
-
-    public ConcurrentDictionary<ulong, Node> GetPeers()
-    {
-        return _Peers;
     }
 
 }

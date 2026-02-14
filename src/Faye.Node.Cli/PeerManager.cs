@@ -1,7 +1,7 @@
 public class PeerManager
 {
-    List<string> nodes = new List<string>
-{
+    readonly List<string> nodes =
+[
 "25miqadfzmfkt6s5lg6alb7jhztqkxpq66hefqhj7vd4mmvuhnvullad.onion",
 "2cbogleytj3doq3crhuhbpe6q4lgwcyex7el4yjku4kduhfnywuaasad.onion",
 "2t55iwnvo2cdtrceapjxtrturdnwbjdfydcilhym3okvl3ibunywgdad.onion",
@@ -118,47 +118,46 @@ public class PeerManager
 "zbc2lt5mlqn4p4pdldwjpdvjndb6alnzrxqss7qwqvjkmhhzgvuzcsqd.onion",
 "zhp32febcps35lzchq3mggrcamhejexgjj4pi3izwltacjpgj64x25ad.onion",
 
-};
+];
 
-    private Network? _Net;
+    private INetworkEvent? _NetEvent;
 
-    public void Bind(Network net)
+    public void Bind(INetworkEvent netEvent)
     {
-        _Net = net;
+        _NetEvent = netEvent;
+        _NetEvent.OnNodeConnected += OnNodeConnected;
     }
 
-    public async Task Run()
+    public void Run()
     {
         foreach (var addr in nodes)
         {
-            _Net?.AddNewPeer(addr);
+            _NetEvent?.AddNewPeer(addr);
 
         }
-
-        while (true)
-        {
-            await HandleInboundMsg();
-        }
-
     }
 
-    public async Task HandleInboundMsg()
+    public void OnNodeConnected(Node node)
     {
-        var peers = _Net.GetPeers();
+        InitializeNode(node);
+        _ = ProcessInboundMsg(node);
+    }
 
-        foreach (var entry in peers)
+    private static void InitializeNode(Node newNode)
+    {
+        IBitcoinPayload versionPayload = new VersionMsg(0);
+        NetMsg version = new(versionPayload, CommandName.Version);
+        if (!newNode.AddOutboundMsg(version))
         {
-            var node = entry.Value;
-            var msg = node.GetInboundMsg();
-            if (msg == null)
-            {
-                await Task.Delay(0);
-                continue;
-            }
+            Console.WriteLine($"Failed to send Version Message");
+        }
+    }
 
-            var header = msg.Header;
-            var cmd = Utils.GetStringWithNoPadding(header.Command);
-
+    public async Task ProcessInboundMsg(Node node)
+    {
+        await foreach (var msg in node.InboundMessages())
+        {
+            var cmd = Utils.GetStringWithNoPadding(msg.Header.Command);
             NetMsg? newMsg = null;
             switch (cmd)
             {
@@ -178,25 +177,11 @@ public class PeerManager
                     break;
                 case "pong":
                     break;
-
-
             }
             if (newMsg != null)
             {
                 node.AddOutboundMsg(newMsg);
             }
-            await Task.Delay(0);
         }
-    }
-
-    public async Task InitializeNode(Node newNode)
-    {
-        IBitcoinPayload versionPayload = new VersionMsg(0);
-        NetMsg version = new(versionPayload, CommandName.Version);
-        if (!newNode.AddOutboundMsg(version))
-        {
-            Console.WriteLine($"Failed to send Version Message");
-        }
-        await Task.Delay(0); //Remove warning
     }
 }
